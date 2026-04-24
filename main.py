@@ -100,7 +100,7 @@ class SieveAI:
         except Exception as tracker_error:
             self.failFast(
                 "startup_tracker_cpu_fallback_failed",
-                "Failed to reinitialize OcSort tracker on CPU fallback.",
+                "Failed to reinitialize StrongSort tracker on CPU fallback.",
                 error=str(tracker_error),
             )
 
@@ -174,7 +174,7 @@ class SieveAI:
             if self.use_cuda:
                 self.switch_to_cpu("startup_tracker_cuda_init_failed", error=str(error))
             else:
-                self.failFast("startup_tracker_init_failed", "Failed to initialize OcSort tracker.", error=str(error))
+                self.failFast("startup_tracker_init_failed", "Failed to initialize StrongSort tracker.", error=str(error))
 
         try:
             self.yolo26 = YOLO(self.model, task="detect")
