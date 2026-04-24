@@ -1,0 +1,4 @@
+/.vscode
+/end2end.onnx
+/yolo26m.engine
+/yolo26m.pt
