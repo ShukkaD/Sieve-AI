@@ -170,7 +170,7 @@ def processYOLOResults(
             recordRecovery("tracker_invalid_track_row", reason="non_finite")
             continue
 
-        # DeepOcSort output: [x1, y1, x2, y2, track_id, conf, cls, det_ind]
+        # StrongSort output: [x1, y1, x2, y2, track_id, conf, cls, det_ind]
         x1, y1, x2, y2 = tuple(map(lambda x: int(np.round(x)), track[:4]))
         objectTrackId = int(track[4])
         current_active_ids.add(objectTrackId)
