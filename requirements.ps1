@@ -1,4 +1,4 @@
-# setup-deps.ps1
+# requirements.ps1
 
 $ErrorActionPreference = "Stop"
 
