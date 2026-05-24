@@ -29,10 +29,10 @@ def generateTrackerInputs(
     if dets.ndim != 2 or dets.shape[1] < 6:
         return np.empty((0, 6), dtype=np.float32)
 
-    # BoxMOT expects [x1, y1, x2, y2, conf, cls].
+    # BoxMOT expects [x1, y1, x2, y2, conf, cls]
     dets = dets[:, :6]
 
-    # Keep only finite rows to avoid numerical issues in Kalman update.
+    # Keep only finite rows to avoid numerical issues in Kalman update
     finite_mask = np.isfinite(dets).all(axis=1)
     dets = dets[finite_mask]
 
@@ -42,8 +42,7 @@ def generateTrackerInputs(
     if frame is not None:
         frame_h, frame_w = frame.shape[:2]
         
-        # PREVENTION: Before clipping, validate coordinate order to catch inverted boxes from YOLO.
-        # This prevents degenerate boxes that could crash the Kalman filter.
+        # Before clipping, validate coordinate order to catch inverted boxes from YOLO
         valid_coords_mask = (dets[:, 0] < dets[:, 2]) & (dets[:, 1] < dets[:, 3])
         dets = dets[valid_coords_mask]
         
@@ -55,9 +54,9 @@ def generateTrackerInputs(
         dets[:, 2] = np.clip(dets[:, 2], 0, frame_w - 1)
         dets[:, 3] = np.clip(dets[:, 3], 0, frame_h - 1)
 
-    # PREVENTION: Require positive-area boxes, reasonable minimum size, and high-confidence detections.
-    # Low-confidence detections (< 0.3) are unreliable and can inject noise into tracker state.
-    # Tiny boxes (< 10 pixels per side) are often false positives or noise.
+    # Require positive-area boxes, reasonable minimum size, and high-confidence detections.
+    # Prune Low-confidence detections (< 0.3)
+    # Prune Tiny boxes (< 10 pixels per side)
     width = dets[:, 2] - dets[:, 0]
     height = dets[:, 3] - dets[:, 1]
     valid_mask = (width >= 10.0) & (height >= 10.0) & (dets[:, 4] > 0.3) & (dets[:, 4] <= 1.0)
@@ -70,8 +69,8 @@ def generateTrackerInputs(
 
 
 
-MAX_STALE_FRAMES = 20  # Stop drawing history if not updated for this many frames.
-MAX_DEAD_TRACK_RETENTION = 100  # Prune track memory every N frames to prevent unbounded growth.
+MAX_STALE_FRAMES = 20  # Stop drawing history if not updated for 20 frames
+MAX_DEAD_TRACK_RETENTION = 100  # Prune track memory every 100 frames to prevent unbounded growth.
 
 def processYOLOResults(
     results: list[Results],
@@ -111,7 +110,7 @@ def processYOLOResults(
     try:
         tracks = tracker.update(dets, currentFrame, embs=None)
     except np.linalg.LinAlgError as error:
-        # Recover from occasional non-positive-definite covariance state in the tracker.
+        # Recover from occasional non-positive-definite covariance state in the tracker
         # Clear active tracks and tracks
         if hasattr(tracker, "active_tracks"):
             tracker.active_tracks = []
@@ -120,13 +119,13 @@ def processYOLOResults(
         
         recordRecovery("tracker_linalg_recovery", error=str(error), num_dets=int(len(dets)))
         
-        # Use track history to maintain visual continuity, but only for recent tracks.
+        # Use track history to maintain visual continuity, but only for recent tracks
         for objectTrackId, track_history in trackHistoryDict.items():
             if len(track_history[0]) > 0:  # Check if position history exists and has entries
-                # Only draw history if the track was seen recently (within MAX_STALE_FRAMES).
+                # Only draw history if the track was seen recently (within MAX_STALE_FRAMES)
                 last_seen = track_last_seen_frame.get(objectTrackId, frame_idx)
                 if frame_idx - last_seen > MAX_STALE_FRAMES:
-                    continue  # Skip stale tracks; allows tracker to recover with fresh detections.
+                    continue  # Skip stale tracks; allows tracker to recover with fresh detections
                 
                 x1, y1, x2, y2 = track_history[0][-1]  # Use most recent position
                 x1 = max(0, min(frame_w - 1, x1))
@@ -144,12 +143,12 @@ def processYOLOResults(
                         recordRecovery("tracker_recovery_draw_exception", error=str(error))
         return pose_inputs
     except Exception as error:
-        # Skip the current frame for any unexpected tracker errors.
+        # Skip the current frame for any unexpected tracker errors
         recordRecovery("tracker_update_exception", error=str(error), num_dets=int(len(dets)))
         return pose_inputs
 
     if tracks is None or len(tracks) == 0:
-        # Periodically prune dead tracks to prevent unbounded memory growth.
+        # Periodically prune dead tracks to prevent unbounded memory growth
         if frame_idx > 0 and frame_idx % MAX_DEAD_TRACK_RETENTION == 0:
             dead_ids = set(track_last_seen_frame.keys())
             for dead_id in dead_ids:
@@ -159,7 +158,7 @@ def processYOLOResults(
                     colorLockDict.pop(dead_id, None)
         return pose_inputs
 
-    # Track active IDs in this frame for memory cleanup.
+    # Track active IDs in this frame for memory cleanup
     current_active_ids = set()
     for track in tracks:
         if len(track) < 8:
@@ -186,7 +185,7 @@ def processYOLOResults(
             recordRecovery("tracker_invalid_track_row", reason="non_positive_area")
             continue
 
-        # Save history and update the frame number for this track.
+        # Save history and update the frame number for this track
         trackHistoryDict[objectTrackId][0].append((x1, y1, x2, y2))
         track_last_seen_frame[objectTrackId] = frame_idx
 
@@ -196,14 +195,14 @@ def processYOLOResults(
 
         color = colorLockDict[objectTrackId]
 
-        #Create and draw the bounding box to the frame
+        # Create and draw the bounding box to the frame
         try:
             cv2.rectangle(currentFrame, (x1, y1), (x2, y2), color, 2)
         except cv2.error as error:
             recordRecovery("yolo_draw_box_exception", error=str(error))
             continue
 
-        #Draw the class name and track ID on the frame with a background for better visibility
+        # Draw the class name and track ID on the frame with a background for better visibility
         class_name = _resolve_class_name(modelType, cls)
 
         if class_name == "person":
@@ -218,7 +217,7 @@ def processYOLOResults(
 
         (text_w, text_h), baseline = cv2.getTextSize(label, font, font_scale, text_thickness)
 
-        # Prefer above the box; if there isn't room, place it below.
+        # Prefer above the box; if there isn't room, place it below
         label_h = text_h + baseline + (pad_y * 2)
         if y1 - label_h >= 0:
             bg_top = y1 - label_h
@@ -249,14 +248,14 @@ def processYOLOResults(
             recordRecovery("yolo_draw_text_exception", error=str(error))
             continue
 
-        # Keep last N points
+        # Keep last 15 points
         if len(trackHistoryDict[objectTrackId][0]) > 15:
             try:
                 trackHistoryDict[objectTrackId][0].pop(0)
             except IndexError:
                 pass
     
-    # Periodically prune dead tracks to prevent unbounded memory growth.
+    # Periodically prune dead tracks to prevent unbounded memory growth
     if frame_idx > 0 and frame_idx % MAX_DEAD_TRACK_RETENTION == 0:
         dead_ids = set(track_last_seen_frame.keys()) - current_active_ids
         for dead_id in dead_ids:
