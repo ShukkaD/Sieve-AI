@@ -1,3 +1,7 @@
+# Tavish To-Do: 
+# 1. Review variable usage to remove superfluous logic
+# 2. Train a Pytorch Action Recognition Model to Take Keypoints
+
 import cv2
 from ultralytics import YOLO
 from rtmlib import RTMPose
@@ -277,8 +281,8 @@ class SieveAI:
 
             self.consecutiveCaptureFailures = 0
 
-            # Use tracking and object detection.
-            # If CUDA/cuDNN is mismatched at runtime, fallback to CPU once and continue.
+            # Use tracking and object detection
+            # If CUDA/cuDNN is mismatched at runtime, fallback to CPU once and continue
             if self.yolo26 is None:
                 self.recordRecovery("yolo_model_missing", self.frame_idx)
                 now = time.time()
@@ -286,7 +290,7 @@ class SieveAI:
                 if now - self.last_yolo_reinit_time >= retry_delay:
                     self.try_reinitialize_yolo()
                 else:
-                    # Prevent tight-loop CPU burn while waiting for next recovery attempt.
+                    # Prevent CPU burn while waiting for next recovery attempt.
                     time.sleep(0.05)
                 continue
 
@@ -322,7 +326,7 @@ class SieveAI:
             img_show = frame.copy()
             det_results = []
 
-            # Keep frame mutation in a single thread. OpenCV drawing is not thread-safe.
+
             try:
                 det_results = processYOLOResults(
                     objectResults,
@@ -345,7 +349,7 @@ class SieveAI:
                 if should_run_pose:
                     img_show = processPoseResults(
                         frame,
-                        det_results,  # pose_inputs
+                        det_results,
                         img_show,
                         self.pose_finder,
                         self.openposeKpts,
@@ -355,14 +359,14 @@ class SieveAI:
             except Exception as error:
                 self.recordRecovery("pose_processing_exception", self.frame_idx, error=str(error))
 
-            # Draw results.
+            # Draw results
             try:
                 cv2.imshow("Sieve AI", img_show)
             except cv2.error as error:
                 self.recordRecovery("display_exception", self.frame_idx, error=str(error))
                 continue
 
-            # Check for exit.
+            # Check for exit
             try:
                 cv2.waitKey(1)
                 if cv2.getWindowProperty("Sieve AI", cv2.WND_PROP_VISIBLE) < 1:
@@ -373,7 +377,7 @@ class SieveAI:
                 self.recordRecovery("window_state_exception", self.frame_idx, error=str(error))
                 continue
 
-            # Increment frame counter only after successful processing.
+            # Increment frame counter only after successful processing
             self.frame_idx += 1
 
     def cleanup(self) -> None:
