@@ -21,8 +21,7 @@ def processPoseResults(
         recordRecovery("pose_invalid_frame_or_image")
         return img_show
 
-    # RTMPose supports empty bboxes by inferring on the full frame.
-    # Sanitize incoming tracker boxes but keep empty-list fallback behavior.
+    # Input specific bboxes but fallback to full frame pose detection if bbox errors occur
     bboxes: list[list[float]] = []
     frame_h, frame_w = frame.shape[:2]
     if pose_inputs:
