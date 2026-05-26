@@ -21,8 +21,8 @@ from ProcessPose import processPoseResults
 
 class SieveAI:
     def __init__(self) -> None:
-        self.pt_model = "yolo26m.pt"
-        self.engine_model = "yolo26m.engine"
+        self.pt_model = "yolo26x.pt"
+        self.engine_model = "yolo26x.engine"
         self.model = self.engine_model if os.path.exists(self.engine_model) else self.pt_model
         self.openposeKpts = False
         self.captureFrames = True

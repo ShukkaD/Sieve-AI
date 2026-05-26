@@ -59,7 +59,8 @@ def generateTrackerInputs(
     # Prune Tiny boxes (< 10 pixels per side)
     width = dets[:, 2] - dets[:, 0]
     height = dets[:, 3] - dets[:, 1]
-    valid_mask = (width >= 10.0) & (height >= 10.0) & (dets[:, 4] > 0.3) & (dets[:, 4] <= 1.0)
+    confidence = dets[:, 4]
+    valid_mask = (width >= 10.0) & (height >= 10.0) & (confidence <= 1.0)
     dets = dets[valid_mask]
 
     if dets.size == 0:
