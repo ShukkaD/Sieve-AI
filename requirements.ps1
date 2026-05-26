@@ -31,6 +31,6 @@ python -m pip install torch torchvision --index-url https://download.pytorch.org
 
 Write-Host "Installing onnxruntime-gpu..."
 python -m pip install -U coloredlogs flatbuffers numpy packaging protobuf sympy
-python -m pip install --pre --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ort-cuda-13-nightly/pypi/simple/ onnxruntime-gpu
+python -m pip install --pre --upgrade--index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ort-cuda-13-nightly/pypi/simple/ onnxruntime-gpu
 
 Write-Host "Finished installing requirements"
