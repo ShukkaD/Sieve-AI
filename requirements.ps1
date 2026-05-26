@@ -27,7 +27,7 @@ Write-Host "Uninstalling torch, torchvision, onnxruntime..."
 python -m pip uninstall -y torch torchvision onnxruntime
 
 Write-Host "Installing PyTorch (CUDA 13 index)..."
-python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu132
+python -m pip install --upgrade torch torchvision --index-url https://download.pytorch.org/whl/cu132
 
 Write-Host "Installing onnxruntime-gpu..."
 python -m pip install -U coloredlogs flatbuffers numpy packaging protobuf sympy
