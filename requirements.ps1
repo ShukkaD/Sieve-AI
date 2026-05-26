@@ -6,15 +6,15 @@ Write-Host "Upgrading pip..."
 python -m pip install --upgrade pip
 
 Write-Host "Installing ultralytics..."
-python -m pip install ultralytics
+python -m pip install -U ultralytics
 
 Write-Host "Installing boxmot..."
-python -m pip install boxmot
+python -m pip install -U boxmot
 
 Write-Host "Installing rtmlib..."
-python -m pip install rtmlib -i https://pypi.org/simple
+python -m pip install -U rtmlib -i https://pypi.org/simple
 
-Write-Host "Upgrading TensorRT (cu12)..."
+Write-Host "Installing TensorRT (CUDA 13)..."
 python -m pip install --upgrade tensorrt-cu13
 
 Write-Host "Upgrading all packages..."
@@ -26,10 +26,11 @@ Remove-Item r.txt
 Write-Host "Uninstalling torch, torchvision, onnxruntime..."
 python -m pip uninstall -y torch torchvision onnxruntime
 
-Write-Host "Installing PyTorch (CUDA 12.8 index)..."
-python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+Write-Host "Installing PyTorch (CUDA 13 index)..."
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu132
 
 Write-Host "Installing onnxruntime-gpu..."
-python -m pip install onnxruntime-gpu
+python -m pip install -U coloredlogs flatbuffers numpy packaging protobuf sympy
+python -m pip install --pre --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ort-cuda-13-nightly/pypi/simple/ onnxruntime-gpu
 
-Write-Host "Done."
+Write-Host "Finished installing requirements"
