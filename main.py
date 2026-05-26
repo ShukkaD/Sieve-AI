@@ -14,30 +14,86 @@ import json
 import sys
 import time
 import os
+from pathlib import Path
 
 from ProcessDet import processYOLOResults
 from ProcessPose import processPoseResults
+from exportYOLO import exportYOLOSieveAI
 
 
 class SieveAI:
     def __init__(self) -> None:
-        self.pt_model = "yolo26x.pt"
-        self.engine_model = "yolo26x.engine"
-        self.model = self.engine_model if os.path.exists(self.engine_model) else self.pt_model
+        self.frame_idx = 0
+        self.recoveryCounters: defaultdict[str, int] = defaultdict(int)
+        self.pt_model_path = "yolo26x.pt"
+        self.engine_model_path = "yolo26x.engine"
+
+        self.pt_model = self.pt_model_path if os.path.exists(self.pt_model_path) else None
+        self.engine_model = self.engine_model_path if os.path.exists(self.engine_model_path) else None
+
+        self.model = (
+            self.engine_model
+            if self.engine_model is not None and os.path.exists(self.engine_model)
+            else self.pt_model
+            if self.pt_model is not None and os.path.exists(self.pt_model)
+            else None
+        )
+
+        if self.model is None:
+            try:
+                exportYOLOSieveAI()
+                if os.path.exists(self.engine_model_path):
+                    self.engine_model = self.engine_model_path
+                    self.model = self.engine_model
+                    print("Exported YOLO model for Sieve AI.")
+
+                else:
+                    raise FileNotFoundError("Exported engine model not found after export attempt.")  
+
+            except Exception as export_error:
+                print(f"Failed to export YOLO model: {export_error}. Trying to use PyTorch model...", file=sys.stderr)
+                
+                if os.path.exists(self.pt_model_path):
+                    self.pt_model = self.pt_model_path
+                    self.model = self.pt_model
+                else:
+                    fetch_result = self.tryFetchYOLOPytorchModel()
+                    if isinstance(fetch_result, (str, bytes, os.PathLike)) and fetch_result == self.pt_model_path and os.path.exists(self.pt_model_path):
+                        print("Successfully loaded PyTorch model for Sieve AI.")
+                        self.pt_model = fetch_result
+                        self.model = self.pt_model
+
+                    else:
+                        self.failFast(
+                            "startup_yolo_model_unavailable",
+                            "No YOLO model available. TensorRT export failed and PyTorch model could not be loaded.",
+                            error=f"export_error: {export_error} | fetch_error: {fetch_result}"
+                        )               
+
         self.openposeKpts = False
         self.captureFrames = True
 
         self.use_cuda = torch.cuda.is_available()
         self.DEVICE_boxmot = "0" if self.use_cuda else "cpu"
-
-        self.frame_idx = 0
-        self.recoveryCounters: defaultdict[str, int] = defaultdict(int)
         self.webcam = None
 
         self.objectTracker = None
         self.yolo26 = None
         self.pose_finder = None
-        self.yolo_backend = "tensorrt" if self.model.endswith(".engine") else "torch"
+        self.yolo_backend = (
+            "tensorrt"
+            if self.model.endswith((".engine", ".plan"))
+            else "torch" if self.model.endswith(".pt")
+            else None
+        )
+
+        if self.yolo_backend is None:
+            self.failFast(
+                "startup_yolo_backend_detection_failed",
+                "Unable to determine YOLO backend from model file extension.",
+                model=self.model,
+            )
+
         self.pose_backend = 'onnxruntime'
         self.pose_full_frame_fallback = False
 
@@ -111,16 +167,29 @@ class SieveAI:
         if move_yolo and self.yolo26 is not None:
             try:
                 if self.yolo_backend == "tensorrt":
-                    if not os.path.exists(self.pt_model):
+                    # If we don't have a local PT model, try to fetch/load it
+                    if not (isinstance(self.pt_model, (str, bytes, os.PathLike)) and os.path.exists(self.pt_model)):
+                        try_fetch = self.tryFetchYOLOPytorchModel()
+                        if isinstance(try_fetch, (str, bytes, os.PathLike)) and try_fetch == self.pt_model_path and os.path.exists(self.pt_model_path):
+                            self.pt_model = str(Path(try_fetch).resolve())
+                            print("Successfully loaded PyTorch model for CPU fallback.")
+                        else:
+                            self.failFast(
+                                "startup_yolo_cpu_fallback_missing_pt",
+                                "TensorRT engine cannot be moved to CPU and the PyTorch model is missing.",
+                                engine_model=self.model,
+                                pt_model=self.pt_model,
+                            )
+                    try:
+                        self.yolo26 = YOLO(self.pt_model, task="detect")
+                        self.model = self.pt_model
+                        self.yolo_backend = "torch"
+                    except Exception as yolo_error:
                         self.failFast(
-                            "startup_yolo_cpu_fallback_missing_pt",
-                            "TensorRT engine cannot be moved to CPU and the PyTorch model is missing.",
-                            engine_model=self.model,
-                            pt_model=self.pt_model,
+                            "startup_yolo_cpu_fallback_failed",
+                            "Failed to move YOLO model to CPU fallback.",
+                            error=str(yolo_error),
                         )
-                    self.yolo26 = YOLO(self.pt_model, task="detect")
-                    self.model = self.pt_model
-                    self.yolo_backend = "torch"
                 else:
                     self.yolo26.to('cpu')
             except Exception as yolo_error:
@@ -140,6 +209,26 @@ class SieveAI:
                     error=str(pose_error),
                 )
 
+    def tryFetchYOLOPytorchModel(self):
+        try:
+            # Try to instantiate YOLO from the expected PT path.
+            pt_model_test = YOLO(self.pt_model_path, task="detect")
+            self.pt_model = self.pt_model_path if os.path.exists(self.pt_model_path) else None
+            if self.pt_model == None:
+                raise FileNotFoundError("YOLO PyTorch model file not found at expected path.")
+            
+            else:
+                print("PyTorch model is now available.")
+                del pt_model_test
+                return self.pt_model
+        
+        except Exception as fetch_error:
+            print(f"Failed to load PyTorch model: {fetch_error}.")
+            self.pt_model = None
+
+            #Return the exception for logging if PyTorch model loading fails
+            return fetch_error
+        
     def recordRecovery(self, error_type: str, frame: int, **details) -> None:
         self.recoveryCounters[error_type] += 1
         count = self.recoveryCounters[error_type]
