@@ -15,7 +15,7 @@ Write-Host "Installing rtmlib..."
 python -m pip install rtmlib -i https://pypi.org/simple
 
 Write-Host "Upgrading TensorRT (cu12)..."
-python -m pip install --upgrade tensorrt-cu12
+python -m pip install --upgrade tensorrt-cu13
 
 Write-Host "Upgrading all packages..."
 python -m pip freeze > r.txt
